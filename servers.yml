@@ -71,56 +71,30 @@ Resources:
           CidrIp: 0.0.0.0/0
 
   WebAppLaunchConfig:
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT5M
     Type: AWS::AutoScaling::LaunchConfiguration
-    Metadata:
-      Comment: Install Web Application
-      AWS::CloudFormation::Init:
-        config:
-          packages:
-            yum:
-              httpd: []
-              php: []
-          files:
-            /var/www/html/index.php:
-              content: |
-                <?php
-                echo '<h1>it works! Udagram, Udacity</h1>';
-                  ?>
-              mode: 000644
-              owner: apache
-              group: apache
-          services:
-            sysvinit:
-              httpd:
-                enabled: true
-                ensureRunning: true
-              sendmail:
-                enabled: false
-                ensureRunning: false
-
     Properties:
-      ImageId: ami-06f2f779464715dc5
-      InstanceType: t3.small
-      BlockDeviceMappings:
-      - DeviceName: "/dev/sdk"
-        Ebs:
-          VolumeSize: '10'
-      SecurityGroups:
-        - !Ref WebServerSecGroup
-      IamInstanceProfile: !Ref RootInstanceProfile
       UserData:
-        Fn::Base64:
-          !Sub |
-            #!/bin/bash
-            yum update -y aws-cfn-bootstrap
-            /opt/aws/bin/cfn-init -s ${AWS::StackName} -r WebServerConfig --region ${AWS::Region}
-
-            /opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'
-
-            /opt/aws/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource WebServerConfig --region ${AWS::Region}
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install Apache 2
+          apt-get update -y
+          apt-get install unzip awscli -y
+          apt-get install apache2 -y
+          systemctl start apache2.service
+          cd /var/www/html
+          # Copy the web application archive
+          aws s3 cp s3://my-bucket/code.zip .
+          # unzip the archive
+          unzip -o code.zip
+      SecurityGroups:
+        - Ref: WebServerSecGroup
+      InstanceType: t3.medium
+      ImageId: ami-005bdb005fb00e791
+      IamInstanceProfile: !Ref RootInstanceProfile
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdk"
+          Ebs:
+            VolumeSize: 10
 
   WebAppGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
